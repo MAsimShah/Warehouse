@@ -1,0 +1,25 @@
+{
+  "_note": "Antigravity CLI reads permissions only from ~/.gemini/antigravity-cli/settings.json (outside this folder). Copy the 'permissions' block there yourself.",
+  "permissions": {
+    "deny": [
+      "command(regex:^\\s*(git|gh)\\b.*)",
+      "command(rm)",
+      "command(del)",
+      "command(Remove-Item)",
+      "command(sqlcmd)",
+      "command(dotnet ef)",
+      "command(regex:(npm|yarn|pnpm|pip)\\s+(install|add|update).*)",
+      "command(dotnet add)",
+      "command(regex:(curl|wget|Invoke-WebRequest).*)",
+      "read_file(.env)",
+      "write_file(.env)",
+      "write_file(appsettings.Production.json)",
+      "write_file(Migrations/)"
+    ],
+    "ask": [
+      "command(*)",
+      "write_file(*)"
+    ],
+    "allow": []
+  }
+}

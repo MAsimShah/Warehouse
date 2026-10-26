@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "defaultMode": "default",
+    "disableBypassPermissionsMode": "disable",
+    "deny": [
+      "Bash(git *)",
+      "PowerShell(git *)",
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(del *)",
+      "Bash(sqlcmd *)",
+      "PowerShell(sqlcmd *)",
+      "Bash(dotnet ef *)",
+      "PowerShell(dotnet ef *)",
+      "Read(**/.env*)",
+      "Edit(**/.env*)",
+      "Read(**/appsettings.Production.json)",
+      "Edit(**/appsettings.Production.json)",
+      "Edit(**/Migrations/**)",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "ask": [
+      "Bash",
+      "PowerShell",
+      "Write",
+      "Edit",
+      "NotebookEdit"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell|Write|Edit|MultiEdit|NotebookEdit|Read|Glob|Grep|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR/.agents/hooks/guard.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}

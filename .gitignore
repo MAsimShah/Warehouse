@@ -1,0 +1,10 @@
+# Secrets
+.env*
+appsettings.Production.json
+secrets.json
+*.pfx
+*.pem
+*.key
+
+# Guardrail hook log
+.agents/logs/
