@@ -8,3 +8,23 @@ secrets.json
 
 # Guardrail hook log
 .agents/logs/
+
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+TestResults/
+*.log
+
+# Node / React
+node_modules/
+dist/
+.vite/
+coverage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
