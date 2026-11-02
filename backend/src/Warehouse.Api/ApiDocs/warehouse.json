@@ -1,0 +1,404 @@
+{
+  "info": {
+    "name": "Warehouse",
+    "description": "Warehouse API (all folders in one collection: Auth, Employees, Profile).\n\nSetup: import this file into Postman, open the collection > Variables tab, fill in 'email' and 'password', then send Auth > Login first. Login and Refresh save the access token into the collection variable 'accessToken' and all other requests use it as the Bearer token.\n\nWho can call what:\n- Auth: login, refresh and logout are open; Me needs a login.\n- Employees: Super Admin only (403 for anyone else).\n- Profile: any logged-in user, always about themselves (the user comes from the token, there is no id in any URL or body).\n\nNotes:\n- The refresh token is an HttpOnly cookie named wh_rt. Postman stores and sends it automatically (cookie jar).\n- Refresh and Logout need the header X-Requested-With: XMLHttpRequest (already set).\n- The access token expires after 15 minutes; call Auth > Refresh to get a new one.\n- Rate limits per IP: login and change password 10/min, refresh and logout 30/min (429 when exceeded).\n- Phone: Australian mobile, 04xx xxx xxx or +61 4xx xxx xxx. Dates: yyyy-MM-dd in the API (dd/MM/yyyy in the app).\n- Photo: a data URL (data:image/jpeg;base64,...) of a JPEG, PNG or WebP, at most 200000 characters.\n- Local HTTPS uses a development certificate: in Postman turn off Settings > General > SSL certificate verification, or run 'dotnet dev-certs https --trust'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "baseurl", "value": "https://localhost:7072/api", "type": "string" },
+    { "key": "email", "value": "shahcorp@gmail.com", "type": "string" },
+    { "key": "password", "value": "Qm7#vT2!xR9$kLp4Zb8&", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "secret" },
+    { "key": "employeeId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "AuthController: /api/auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('accessToken', pm.response.json().accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"rememberMe\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/auth/login",
+              "host": ["{{baseurl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Logs in. Returns the access token in the body and sets the wh_rt refresh cookie.\n\nBody: email (required, valid email, max 254), password (required, max 128), rememberMe (optional, default false). rememberMe=false gives a session cookie (valid 1 day, ends when the browser closes); rememberMe=true gives a persistent cookie valid 30 days that is extended on every refresh.\n\n200: { accessToken, expiresAtUtc, user { id, name, email, isSuperAdmin, role, profilePhoto } }\n400: missing body or validation errors\n401: invalid credentials, inactive user or locked account (5 wrong passwords lock for 15 minutes)\n429: too many requests"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('accessToken', pm.response.json().accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "X-Requested-With", "value": "XMLHttpRequest" }
+            ],
+            "url": {
+              "raw": "{{baseurl}}/auth/refresh",
+              "host": ["{{baseurl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Uses the wh_rt cookie (sent automatically) to get a new access token. The refresh token is rotated: a new cookie replaces the old one. No body. Method is POST (not GET) on purpose.\n\n200: same body as Login\n400: missing X-Requested-With header\n401: cookie missing, expired, revoked or reused (the cookie is cleared; reuse ends all sessions of that user)\n429: too many requests"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code === 204) {",
+                  "  pm.collectionVariables.set('accessToken', '');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "X-Requested-With", "value": "XMLHttpRequest" }
+            ],
+            "url": {
+              "raw": "{{baseurl}}/auth/logout",
+              "host": ["{{baseurl}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Revokes the refresh token in the wh_rt cookie and clears the cookie. No body.\n\n204: done, no body\n400: missing X-Requested-With header\n429: too many requests"
+          },
+          "response": []
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseurl}}/auth/me",
+              "host": ["{{baseurl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Returns the logged-in user read from the access token (Bearer {{accessToken}}, set by Login). No body.\n\n200: { id, name, email, isSuperAdmin }\n401: missing, invalid or expired access token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "description": "EmployeesController: /api/employees (Super Admin only).\n\n- An employee is a person record. Turn on hasAccess to also create a login (role, status, password); leave it off for a record only.\n- Email is saved in Employees and, when there is a login, in Users too. It must be unique in both.\n- Role is sent as text (for example \"Dispatcher\"). Allowed: WarehouseAdmin, WarehouseManager, ShipmentReceivingClerk, SortingOperator, LoaderDispatchOperator, Dispatcher, Driver, InventoryAuditOfficer, FinanceOfficer, CarrierRepresentative, ClientMerchant. SuperAdmin is not allowed.\n- Status is \"Active\" or \"Inactive\" and belongs to the login, so it is only used when hasAccess is true.\n- Create saves the new employee id into the variable 'employeeId' so Get, Update and Delete work straight after it.\n- Log in as the Super Admin first (Auth > Login).",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseurl}}/employees?search=",
+              "host": ["{{baseurl}}"],
+              "path": ["employees"],
+              "query": [
+                { "key": "search", "value": "", "description": "Optional. Part of the name or email (max 100 characters).", "disabled": true }
+              ]
+            },
+            "description": "Lists all employees, ordered by name. Super Admin accounts are not employees and are not listed. Enable the 'search' query parameter to filter by name or email.\n\n200: [ { id, name, email, phone, startDate, profilePhoto, hasAccess, role, status, createdAtUtc, lastLoginAtUtc } ]\n  role and status are null when hasAccess is false (record only).\n401: missing, invalid or expired access token\n403: not a Super Admin"
+          },
+          "response": []
+        },
+        {
+          "name": "Get by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseurl}}/employees/{{employeeId}}",
+              "host": ["{{baseurl}}"],
+              "path": ["employees", "{{employeeId}}"]
+            },
+            "description": "Returns one employee. Uses the 'employeeId' variable (set by Create, or paste an id from List).\n\n200: employee (same shape as in List)\n401: missing, invalid or expired access token\n403: not a Super Admin\n404: no employee with this id"
+          },
+          "response": []
+        },
+        {
+          "name": "Create - record only (no login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('employeeId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sam Taylor\",\n  \"email\": \"sam.taylor@example.com\",\n  \"phone\": \"0412 345 678\",\n  \"startDate\": \"2026-11-02\",\n  \"profilePhoto\": null,\n  \"hasAccess\": false,\n  \"role\": null,\n  \"status\": null,\n  \"password\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/employees",
+              "host": ["{{baseurl}}"],
+              "path": ["employees"]
+            },
+            "description": "Creates an employee record only. The person cannot log in. Saves the new id in 'employeeId'.\n\nBody: name (required, 2 to 100 characters), email (required, valid, unique), phone (optional, Australian mobile), startDate (optional, yyyy-MM-dd), profilePhoto (optional data URL or null), hasAccess (false).\n\n201: the new employee\n400: missing body, validation errors, or the email is already used\n401: missing, invalid or expired access token\n403: not a Super Admin\n413: body larger than 300000 bytes (photo too large)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create - with login (system access)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('employeeId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alex Morgan\",\n  \"email\": \"alex.morgan@example.com\",\n  \"phone\": \"+61 412 345 679\",\n  \"startDate\": \"2026-11-02\",\n  \"profilePhoto\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\",\n  \"hasAccess\": true,\n  \"role\": \"Dispatcher\",\n  \"status\": \"Active\",\n  \"password\": \"Tr7#kLm2!pQx9$Zv\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/employees",
+              "host": ["{{baseurl}}"],
+              "path": ["employees"]
+            },
+            "description": "Creates an employee and a login. The employee logs in with this email and password. Saves the new id in 'employeeId'.\n\nBody: same as 'Create - record only', plus hasAccess = true, role (required, see the folder description), status (\"Active\" or \"Inactive\", default Active) and password (required; at least 12 characters with upper and lower case, a number and a symbol, not a common password).\n\n201: the new employee, with hasAccess true, role and status\n400: validation errors (for example role, email or password), or the email is already used by an employee or a login\n401: missing, invalid or expired access token\n403: not a Super Admin\n413: body larger than 300000 bytes (photo too large)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alex Morgan\",\n  \"email\": \"alex.morgan@example.com\",\n  \"phone\": \"0412 345 679\",\n  \"startDate\": \"2026-11-02\",\n  \"profilePhoto\": null,\n  \"hasAccess\": true,\n  \"role\": \"WarehouseManager\",\n  \"status\": \"Active\",\n  \"password\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/employees/{{employeeId}}",
+              "host": ["{{baseurl}}"],
+              "path": ["employees", "{{employeeId}}"]
+            },
+            "description": "Replaces the employee's details (send every field, like the form does). Uses the 'employeeId' variable.\n\n- hasAccess true on a record-only employee creates the login (role and password required).\n- hasAccess true on an employee with a login keeps it and updates role and status. password null or empty keeps the current password; a value resets it and ends the user's sessions.\n- hasAccess false on an employee with a login sets the login Inactive and ends its sessions. The record stays.\n- name, email and profilePhoto are copied to the login as well, so both tables stay the same.\n\n200: the updated employee\n400: validation errors, or the email is already used\n401: missing, invalid or expired access token\n403: not a Super Admin\n404: no employee with this id\n413: body larger than 300000 bytes (photo too large)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseurl}}/employees/{{employeeId}}",
+              "host": ["{{baseurl}}"],
+              "path": ["employees", "{{employeeId}}"]
+            },
+            "description": "Removes an employee. Uses the 'employeeId' variable. No body.\n\n- Employee with a login: the login becomes Inactive and its sessions end. The record is kept (users are never hard-deleted).\n- Record-only employee (no login): the record is removed.\n\n200: the employee as it was (for a login, its status is now Inactive)\n401: missing, invalid or expired access token\n403: not a Super Admin\n404: no employee with this id"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "description": "ProfileController: /api/profile (any logged-in user).\n\n- The user is always taken from the access token, so nobody can change another person's profile.\n- Role and status are not here. Only the Super Admin changes them (Employees folder).\n- Name and email are saved in Users and, when the user has an employee record, in Employees too. Phone is saved in Employees only, so the Super Admin (no employee record) has no phone.\n- Photo is saved in Users and, when there is an employee record, in Employees too.\n- Changing the password ends all sessions of the user, so send Auth > Login again afterwards.",
+      "item": [
+        {
+          "name": "Get",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseurl}}/profile",
+              "host": ["{{baseurl}}"],
+              "path": ["profile"]
+            },
+            "description": "Returns the logged-in user's own details. No body.\n\n200: { id, name, email, phone, hasEmployeeRecord, isSuperAdmin, role, profilePhoto }\n  phone is null when hasEmployeeRecord is false.\n401: missing, invalid or expired access token\n404: the user no longer exists"
+          },
+          "response": []
+        },
+        {
+          "name": "Update details",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Shah Corp\",\n  \"email\": \"shahcorp@gmail.com\",\n  \"phone\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/profile",
+              "host": ["{{baseurl}}"],
+              "path": ["profile"]
+            },
+            "description": "Changes the user's own name, email and phone. The email is also the login email. Role, status and photo are not changed here.\n\nBody: name (required, 2 to 100 characters), email (required, valid, not used by anyone else), phone (optional Australian mobile; ignored when the user has no employee record).\n\n200: the updated profile (same shape as Get)\n400: missing body, validation errors, or the email is already in use\n401: missing, invalid or expired access token\n404: the user no longer exists\n\nNote: the name and email inside the current access token stay the same until the token is refreshed."
+          },
+          "response": []
+        },
+        {
+          "name": "Set photo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profilePhoto\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/profile/photo",
+              "host": ["{{baseurl}}"],
+              "path": ["profile", "photo"]
+            },
+            "description": "Sets the user's photo. It is saved in Users and, when the user has an employee record, in Employees as well, so both stay the same.\n\nBody: profilePhoto (data URL of a JPEG, PNG or WebP, at most 200000 characters). The sample is a tiny 1x1 pixel image; paste your own data URL to test a real photo.\n\n200: the updated profile (same shape as Get)\n400: missing body or the photo is not a valid image data URL / too long\n401: missing, invalid or expired access token\n404: the user no longer exists\n413: body larger than 300000 bytes"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove photo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profilePhoto\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/profile/photo",
+              "host": ["{{baseurl}}"],
+              "path": ["profile", "photo"]
+            },
+            "description": "Removes the user's photo (null or empty string). It is removed from Users and from Employees (when there is an employee record).\n\n200: the updated profile, with profilePhoto null\n400: missing body\n401: missing, invalid or expired access token\n404: the user no longer exists"
+          },
+          "response": []
+        },
+        {
+          "name": "Change password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });",
+                  "if (pm.response.code === 204) {",
+                  "  pm.collectionVariables.set('accessToken', '');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"newPassword\": \"Nw8#pLq3!vTz6$Hx\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseurl}}/profile/password",
+              "host": ["{{baseurl}}"],
+              "path": ["profile", "password"]
+            },
+            "description": "Changes the user's own password. All the user's sessions end, so the saved access token is cleared; send Auth > Login again with the new password (update the 'password' variable first).\n\nBody: currentPassword (required, max 128), newPassword (required, max 128; at least 12 characters with upper and lower case, a number and a symbol, not a common password).\n\n204: changed, no body\n400: validation errors: 'currentPassword' (wrong current password) or 'newPassword' (does not meet the rules)\n401: missing, invalid or expired access token\n404: the user no longer exists\n429: too many requests (10 per minute per IP, same as login)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

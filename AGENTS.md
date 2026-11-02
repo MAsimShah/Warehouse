@@ -5,6 +5,10 @@ Warehouse management system. Early stage: no application code yet.
 This file is the single source of truth for ALL AI agents (Claude, Codex, Grok, Antigravity, etc.).
 Edit rules here only. Do not copy them into tool-specific files.
 
+## Business requirements
+Read `docs/requirements.md` before any feature work (roles, permissions, shipments, parcels, statuses). It is a draft: items marked PROPOSED are open and must be confirmed with the user.
+This is a parcel distribution hub (receive, sort, load, dispatch, deliver), NOT a stock/SKU inventory system.
+
 ## Planned stack
 - Frontend: React
 - Backend: ASP.NET Core Web API
